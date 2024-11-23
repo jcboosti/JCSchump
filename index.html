@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Liberty Space Shooter</title>
     <style>
-        body, html {
+        body,
+        html {
             margin: 0;
             padding: 0;
             font-family: 'Arial', sans-serif;
@@ -16,16 +18,19 @@
             user-select: none;
             -webkit-user-select: none;
         }
+
         #game-container {
             display: flex;
             height: 100vh;
             flex-direction: column-reverse;
         }
+
         @media (min-width: 768px) {
             #game-container {
                 flex-direction: row;
             }
         }
+
         #game-canvas {
             flex-grow: 1;
             background-color: #16213e;
@@ -34,6 +39,7 @@
             background-image: radial-gradient(#243b55 1px, transparent 1px);
             background-size: 30px 30px;
         }
+
         #game-ui {
             width: 100%;
             height: 120px;
@@ -44,6 +50,7 @@
             justify-content: space-around;
             align-items: center;
         }
+
         @media (min-width: 768px) {
             #game-ui {
                 width: 200px;
@@ -51,6 +58,7 @@
                 flex-direction: column;
             }
         }
+
         .player {
             width: 40px;
             height: 50px;
@@ -61,6 +69,7 @@
             background-position: center;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 120'%3E%3Cpath d='M50 0L35 20l-10 70h50l-10-70L50 0z' fill='%23e1e1e1'/%3E%3Cpath d='M25 90v10h50V90H25z' fill='%23c4c4c4'/%3E%3Cpath d='M40 20h20L50 0 40 20z' fill='%23f4f4f4'/%3E%3Cpath d='M35 40h30l5-20H30l5 20z' fill='%23d4d4d4'/%3E%3Cpath d='M45 25h10v25H45z' fill='%23b4b4b4'/%3E%3Ccircle cx='50' cy='35' r='3' fill='%23e94560'/%3E%3C/svg%3E");
         }
+
         .bullet {
             width: 6px;
             height: 12px;
@@ -69,6 +78,7 @@
             border-radius: 3px;
             transform-origin: center;
         }
+
         .enemy {
             width: 30px;
             height: 30px;
@@ -76,6 +86,7 @@
             position: absolute;
             clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
         }
+
         .power-up {
             width: 20px;
             height: 20px;
@@ -84,21 +95,33 @@
             border-radius: 50%;
             animation: pulse 1s infinite;
         }
+
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            100% {
+                transform: scale(1);
+            }
         }
+
         .error-boundary {
             padding: 20px;
             text-align: center;
             background-color: #e94560;
             color: white;
         }
+
         .score-display {
             font-size: 1.2em;
             text-align: center;
         }
+
         @media (max-width: 767px) {
             .score-display {
                 font-size: 1em;
@@ -106,6 +129,7 @@
         }
     </style>
 </head>
+
 <body>
     <div id="root"></div>
 
@@ -137,7 +161,7 @@
                         <div className="error-boundary">
                             <h2>Something went wrong!</h2>
                             <p>{this.state.error && this.state.error.message}</p>
-                            <button 
+                            <button
                                 onClick={() => window.location.reload()}
                                 style={{
                                     padding: '10px 20px',
@@ -271,7 +295,7 @@
                         setBullets(prev => [...prev, {
                             x: playerPos.x + 17,
                             y: playerPos.y,
-                            angle: -Math.PI/2,
+                            angle: -Math.PI / 2,
                             id: Date.now()
                         }]);
                     }
@@ -297,7 +321,7 @@
                                 });
                             }
                         }
-                        
+
                         return prev
                             .map(enemy => ({
                                 ...enemy,
@@ -341,7 +365,7 @@
 
             const checkCollision = (obj1, obj2, size1, size2) => {
                 return Math.abs(obj1.x - obj2.x) < (size1 + size2) / 2 &&
-                       Math.abs(obj1.y - obj2.y) < (size1 + size2) / 2;
+                    Math.abs(obj1.y - obj2.y) < (size1 + size2) / 2;
             };
 
             return (
@@ -399,10 +423,28 @@
                                     color: 'white',
                                     border: 'none',
                                     cursor: 'pointer'
-                                }}>
-                            </div>
-                            )
-                            }
-                            }
-                        </script>
-                            
+                                }}
+                            >
+                                Start Game
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div id="game-container">
+                    <GameCanvas gameState={gameState} onScoreUpdate={handleScoreUpdate} />
+                    <GameUI gameState={gameState} />
+                </div>
+            );
+        }
+
+        // Add the mounting code at the end
+        ReactDOM.render(
+            <ErrorBoundary>
+                <PixelShooterGame />
+            </ErrorBoundary>,
+            document.getElementById('root')
+        );
+    </script>
