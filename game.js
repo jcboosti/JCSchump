@@ -4,6 +4,11 @@ class GameState {
         this.level = 1;
         this.difficulty = 1;
         this.lives = 3;
+        this.killsInLevel = 0;
+        this.killsRequiredForBoss = 30;
+        this.isBossFight = false;
+        this.bossHealth = 0;
+        this.maxBossHealth = 0;
         this.lastExtraLifeScore = 0;
         this.nextLifeRequirement = 2500;  // Initial requirement
         this.powerUps = {
@@ -17,6 +22,23 @@ class GameState {
         this.enemySpeed = 3;
         this.isGiantMode = false;
         this.isSpaceInvaderLevel = false;
+        
+        // Tutorial state
+        this.isTutorial = true;
+        this.tutorialStep = 0;
+        this.tutorialComplete = false;
+        
+        // Permanent power-ups
+        this.permanentPowerUps = {
+            doubleBullets: false,
+            tripleShot: false,
+            wideShot: false,
+            rapidFire: false
+        };
+        
+        // Enemy progression
+        this.enemyBaseSpeed = 3;
+        this.enemySpeedMultiplier = 1;
     }
 
     addScore(points) {
@@ -51,19 +73,73 @@ class GameState {
     }
 
     checkLevelUp() {
-        const newLevel = Math.floor(this.score / 1000) + 1;
-        if (newLevel > this.level) {
-            this.level = newLevel;
-            this.enemySpeed *= 1.05;  // Increase enemy speed by 5%
-            
-            // Check for space invader level
-            if (this.level % 10 === 0) {
-                this.isSpaceInvaderLevel = true;
-                this.showSpaceInvaderAnnouncement();
-            } else {
-                this.showLevelAnnouncement();
-            }
+        // Remove the automatic level up based on score
+        // Now levels progress based on killing the boss
+        if (this.isBossFight) {
+            return;
         }
+
+        // Check if we've killed enough enemies to trigger boss
+        if (this.killsInLevel >= this.killsRequiredForBoss) {
+            this.startBossFight();
+        }
+    }
+
+    startBossFight() {
+        this.isBossFight = true;
+        this.bossHealth = 100 * this.level; // Boss health scales with level
+        this.maxBossHealth = this.bossHealth;
+        this.showBossWarning();
+    }
+
+    showBossWarning() {
+        const gameCanvas = document.getElementById('game-canvas');
+        const warning = document.createElement('div');
+        warning.textContent = 'WARNING: BOSS APPROACHING';
+        warning.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FF0000;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #FF0000;
+            animation: flash 1s infinite;
+        `;
+        gameCanvas.appendChild(warning);
+        
+        setTimeout(() => {
+            warning.remove();
+            window.gameInstance.spawnBoss();
+        }, 3000);
+    }
+
+    completeBossFight() {
+        this.isBossFight = false;
+        this.level++;
+        this.killsInLevel = 0;
+        this.killsRequiredForBoss = Math.min(50, 30 + (this.level - 1) * 5);
+        this.difficulty *= 1.2;
+        this.showLevelComplete();
+    }
+
+    showLevelComplete() {
+        const gameCanvas = document.getElementById('game-canvas');
+        const complete = document.createElement('div');
+        complete.textContent = `LEVEL ${this.level - 1} COMPLETE!`;
+        complete.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #FFD700;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #FFD700;
+        `;
+        gameCanvas.appendChild(complete);
+        setTimeout(() => complete.remove(), 3000);
     }
 
     showLevelAnnouncement() {
@@ -120,6 +196,8 @@ class GameState {
 
     loseLife() {
         this.lives--;
+        // Reset temporary power-ups on death
+        this.resetTemporaryPowerUps();
         this.updateUI();
         return this.lives <= 0;
     }
@@ -128,6 +206,66 @@ class GameState {
         document.getElementById('score').textContent = `Score: ${this.score}`;
         document.getElementById('level').textContent = `Level: ${this.level}`;
         document.getElementById('lives').textContent = `Lives: ${this.lives}`;
+    }
+
+    startTutorial() {
+        const messages = [
+            "Use Arrow Keys to Move",
+            "Press Space to Shoot",
+            "Destroy the Enemy to Continue",
+            "Collect Power-ups to Upgrade Your Ship",
+            "Power-ups Last Until Death",
+            "Watch Out for Pink Enemies - They Shoot Back!",
+            "Ready for Your First Boss?"
+        ];
+
+        this.showTutorialMessage(messages[this.tutorialStep]);
+    }
+
+    showTutorialMessage(message) {
+        const gameCanvas = document.getElementById('game-canvas');
+        const tutorialBox = document.createElement('div');
+        tutorialBox.style.cssText = `
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            border: 2px solid #4CAF50;
+            font-size: 20px;
+            text-align: center;
+            z-index: 1000;
+        `;
+        tutorialBox.textContent = message;
+        gameCanvas.appendChild(tutorialBox);
+        
+        setTimeout(() => tutorialBox.remove(), 4000);
+    }
+
+    advanceTutorial() {
+        this.tutorialStep++;
+        if (this.tutorialStep >= 7) {
+            this.completeTutorial();
+        } else {
+            this.startTutorial();
+        }
+    }
+
+    completeTutorial() {
+        this.isTutorial = false;
+        this.tutorialComplete = true;
+        this.showTutorialMessage("Tutorial Complete! Good Luck!");
+    }
+
+    resetTemporaryPowerUps() {
+        // Keep permanent power-ups, reset temporary ones
+        window.gameInstance.doubleBullets = this.permanentPowerUps.doubleBullets;
+        window.gameInstance.tripleShot = this.permanentPowerUps.tripleShot;
+        window.gameInstance.wideShot = this.permanentPowerUps.wideShot;
+        window.gameInstance.rapidFire = this.permanentPowerUps.rapidFire;
     }
 }
 
@@ -153,6 +291,10 @@ class Game {
         this.invaderDirection = 1;
         this.invaderStepDown = false;
         this.rainbowInterval = null;
+        this.tripleShot = false;
+        this.wideShot = false;
+        this.rapidFire = false;
+        this.shootingInterval = 125; // Base shooting interval
     }
 
     createPlayer() {
@@ -200,6 +342,12 @@ class Game {
         
         // Start fresh game loop
         this.startGameLoop();
+        
+        // Start tutorial if it's the first level
+        if (this.gameState.isTutorial) {
+            this.gameState.startTutorial();
+            this.setupTutorialLevel();
+        }
     }
 
     clearGame() {
@@ -409,18 +557,24 @@ class Game {
         this.player.style.top = `${y}px`;
     }
 
-    createBullet(offset = 0) {
+    createBullet(xOffset = 0, yOffset = 0) {
         const bullet = document.createElement('div');
         bullet.className = 'bullet';
         const playerRect = this.player.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
         
-        const playerCenterX = playerRect.left + (playerRect.width / 2);
-        const bulletOffset = 3;
+        const playerCenterX = playerRect.left - canvasRect.left + (playerRect.width / 2);
         
-        bullet.style.left = `${playerCenterX - bulletOffset + offset}px`;
-        bullet.style.top = `${playerRect.top - 140}px`;
+        bullet.style.cssText = `
+            position: absolute;
+            width: 6px;
+            height: 15px;
+            background-color: #00ff00;
+            border-radius: 3px;
+            left: ${playerCenterX + xOffset}px;
+            top: ${playerRect.top - canvasRect.top + yOffset}px;
+        `;
         
-        bullet.dataset.id = Date.now();
         this.canvas.appendChild(bullet);
         return bullet;
     }
@@ -572,11 +726,19 @@ class Game {
 
     createEnemyBullet(x, y) {
         const bullet = document.createElement('div');
-        bullet.className = 'enemy-bullet flashing';  // Add flashing class
+        bullet.className = 'enemy-bullet flashing';
         bullet.style.left = `${x}px`;
         bullet.style.top = `${y}px`;
         this.canvas.appendChild(bullet);
-        return bullet;
+        
+        // Return bullet with downward-only velocity
+        return {
+            element: bullet,
+            velocity: {
+                x: 0,  // No horizontal movement
+                y: 7   // Only move downward
+            }
+        };
     }
 
     startGameLoop() {
@@ -586,26 +748,8 @@ class Game {
             this.updatePlayerPosition();
 
             // Shooting logic update
-            if (this.isShooting && Date.now() - this.lastShotTime > 125) {
-                if (this.doubleBullets) {
-                    // Create two bullets side by side for player
-                    this.bullets.push(this.createBullet(-10)); // Left bullet
-                    this.bullets.push(this.createBullet(10));  // Right bullet
-                    
-                    // If companion ship exists, mirror the shooting
-                    if (this.companionShip) {
-                        this.bullets.push(this.createCompanionBullet(-10));
-                        this.bullets.push(this.createCompanionBullet(10));
-                    }
-                } else {
-                    // Create single bullet for player
-                    this.bullets.push(this.createBullet());
-                    
-                    // If companion ship exists, mirror the shooting
-                    if (this.companionShip) {
-                        this.bullets.push(this.createCompanionBullet());
-                    }
-                }
+            if (this.isShooting && Date.now() - this.lastShotTime > this.shootingInterval) {
+                this.shoot();
                 this.lastShotTime = Date.now();
             }
 
@@ -630,12 +774,14 @@ class Game {
                 }
             });
 
-            // Create enemies with random type
-            if (Math.random() < 0.03) {
-                if (Math.random() < 0.3) {  // 30% chance for shooter enemy
-                    this.enemies.push(this.createShooterEnemy());
-                } else {
-                    this.enemies.push(this.createEnemy());
+            // Only spawn enemies if NOT in boss fight
+            if (!this.gameState.isBossFight) {
+                if (Math.random() < 0.03) {
+                    if (Math.random() < 0.3) {
+                        this.enemies.push(this.createShooterEnemy());
+                    } else {
+                        this.enemies.push(this.createEnemy());
+                    }
                 }
             }
 
@@ -650,28 +796,17 @@ class Game {
                     if (currentTop < 150 || hasFired) {  // Move until reaching firing position
                         enemy.style.top = `${currentTop + (2 * this.gameState.difficulty)}px`;
                     } else if (!hasFired) {
-                        // Fire at player
+                        // Fire straight down
                         enemy.dataset.hasFired = 'true';
                         const enemyRect = enemy.getBoundingClientRect();
-                        const playerRect = this.player.getBoundingClientRect();
+                        const canvasRect = this.canvas.getBoundingClientRect();
                         
-                        // Calculate angle to player
-                        const dx = playerRect.left - enemyRect.left;
-                        const dy = playerRect.top - enemyRect.top;
-                        const angle = Math.atan2(dy, dx);
-                        
-                        // Create bullet with trajectory
+                        // Create bullet at enemy position
                         const bullet = this.createEnemyBullet(
-                            enemyRect.left - this.canvas.getBoundingClientRect().left + enemyRect.width/2,
-                            enemyRect.top - this.canvas.getBoundingClientRect().top + enemyRect.height
+                            enemyRect.left - canvasRect.left + enemyRect.width/2,
+                            enemyRect.top - canvasRect.top + enemyRect.height
                         );
-                        this.enemyBullets.push({
-                            element: bullet,
-                            velocity: {
-                                x: Math.cos(angle) * 5,
-                                y: Math.sin(angle) * 5
-                            }
-                        });
+                        this.enemyBullets.push(bullet);
                     }
                 } else {
                     // Normal enemy behavior
@@ -702,6 +837,10 @@ class Game {
                         
                         this.createParticleExplosion(enemyX, enemyY);
                         this.playExplosionSound();
+
+                        // Increment kills counter and check for boss fight
+                        this.gameState.killsInLevel++;
+                        this.gameState.checkLevelUp();  // Check if we should start boss fight
 
                         // Modify power-up spawn logic: 10% chance for power-up on enemy kill
                         if (Math.random() < 0.1) {
@@ -898,6 +1037,37 @@ class Game {
 
             // Update space invaders
             this.updateSpaceInvaders();
+
+            // Check bullet collisions with boss
+            if (this.boss && this.gameState.isBossFight) {
+                this.bullets.forEach((bullet, bulletIndex) => {
+                    if (this.checkCollision(bullet, this.boss)) {
+                        const bossRect = this.boss.getBoundingClientRect();
+                        const canvasRect = this.canvas.getBoundingClientRect();
+                        
+                        this.createParticleExplosion(
+                            bossRect.left - canvasRect.left + Math.random() * bossRect.width,
+                            bossRect.top - canvasRect.top + Math.random() * bossRect.height
+                        );
+                        
+                        bullet.remove();
+                        this.bullets.splice(bulletIndex, 1);
+                        
+                        // Damage boss
+                        this.gameState.bossHealth -= 1;
+                        this.bossHealthBar.style.width = `${(this.gameState.bossHealth / this.gameState.maxBossHealth) * 100}%`;
+                        
+                        // Check if boss is defeated
+                        if (this.gameState.bossHealth <= 0) {
+                            this.defeatBoss();
+                        }
+                    }
+                });
+            }
+
+            // Update boss
+            this.updateBoss();
+
         }, 1000 / 60);
     }
 
@@ -1273,20 +1443,235 @@ class Game {
     }
 
     // Add new method for companion ship bullets
-    createCompanionBullet(offset = 0) {
+    createCompanionBullet(xOffset = 0, yOffset = 0) {
         const bullet = document.createElement('div');
         bullet.className = 'bullet';
         const companionRect = this.companionShip.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
         
-        const companionCenterX = companionRect.left + (companionRect.width / 2);
-        const bulletOffset = 3;
+        const companionCenterX = companionRect.left - canvasRect.left + (companionRect.width / 2);
         
-        bullet.style.left = `${companionCenterX - bulletOffset + offset}px`;
-        bullet.style.top = `${companionRect.top - 140}px`;
+        bullet.style.cssText = `
+            position: absolute;
+            width: 6px;
+            height: 15px;
+            background-color: #00ff00;
+            border-radius: 3px;
+            left: ${companionCenterX + xOffset}px;
+            top: ${companionRect.top - canvasRect.top + yOffset}px;
+        `;
         
-        bullet.dataset.id = Date.now() + '-companion';
         this.canvas.appendChild(bullet);
         return bullet;
+    }
+
+    spawnBoss() {
+        const boss = document.createElement('div');
+        boss.className = 'boss';
+        boss.style.cssText = `
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            background-image: url('boss.png');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            top: -180px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 2px solid #FF0000;  /* Add border to make hitbox visible */
+        `;
+        this.canvas.appendChild(boss);
+        this.boss = boss;
+        
+        // Add health bar with improved styling
+        const healthBar = document.createElement('div');
+        healthBar.className = 'boss-health';
+        healthBar.style.cssText = `
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 25px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 3px solid #888;
+            border-radius: 12px;
+            overflow: hidden;
+        `;
+        
+        const healthFill = document.createElement('div');
+        healthFill.style.cssText = `
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to right, #ff0000, #ff4444);
+            transition: width 0.3s;
+            border-radius: 8px;
+        `;
+        healthBar.appendChild(healthFill);
+        this.canvas.appendChild(healthBar);
+        this.bossHealthBar = healthFill;
+    }
+
+    updateBoss() {
+        if (!this.boss || !this.gameState.isBossFight) return;
+
+        // Boss movement pattern
+        const time = Date.now() / 1000;
+        const centerX = this.canvas.clientWidth / 2;
+        const amplitude = this.canvas.clientWidth / 3;
+        
+        // Sine wave movement
+        const x = centerX + Math.sin(time) * amplitude;
+        this.boss.style.left = `${x}px`;
+        
+        // Ensure boss is on screen
+        if (parseFloat(this.boss.style.top) < 50) {
+            this.boss.style.top = `${parseFloat(this.boss.style.top) + 2}px`;
+        }
+
+        // Boss shooting
+        if (Math.random() < 0.05) { // 5% chance each frame to shoot
+            this.createBossBullet();
+        }
+    }
+
+    createBossBullet() {
+        const bossRect = this.boss.getBoundingClientRect();
+        const playerRect = this.player.getBoundingClientRect();
+        
+        // Calculate angle to player
+        const dx = playerRect.left - bossRect.left;
+        const dy = playerRect.top - bossRect.top;
+        const angle = Math.atan2(dy, dx);
+        
+        const bullet = document.createElement('div');
+        bullet.className = 'boss-bullet';
+        bullet.style.cssText = `
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: #FF0000;
+            border-radius: 50%;
+            left: ${bossRect.left - this.canvas.getBoundingClientRect().left + bossRect.width/2}px;
+            top: ${bossRect.top - this.canvas.getBoundingClientRect().top + bossRect.height}px;
+        `;
+        
+        this.canvas.appendChild(bullet);
+        this.enemyBullets.push({
+            element: bullet,
+            velocity: {
+                x: Math.cos(angle) * 7,
+                y: Math.sin(angle) * 7
+            }
+        });
+    }
+
+    defeatBoss() {
+        // Create multiple explosions
+        for (let i = 0; i < 10; i++) {
+            setTimeout(() => {
+                const bossRect = this.boss.getBoundingClientRect();
+                const canvasRect = this.canvas.getBoundingClientRect();
+                this.createParticleExplosion(
+                    bossRect.left - canvasRect.left + Math.random() * bossRect.width,
+                    bossRect.top - canvasRect.top + Math.random() * bossRect.height
+                );
+            }, i * 100);
+        }
+
+        // Remove boss and health bar
+        this.boss.remove();
+        this.boss = null;
+        if (this.bossHealthBar) {
+            this.bossHealthBar.parentElement.remove();
+            this.bossHealthBar = null;
+        }
+
+        // Award score and complete level
+        this.gameState.addScore(10000 * this.gameState.level);
+        this.gameState.completeBossFight();
+    }
+
+    setupTutorialLevel() {
+        // Clear existing enemies
+        this.enemies.forEach(enemy => enemy.remove());
+        this.enemies = [];
+        
+        // Spawn enemies based on tutorial step
+        switch(this.gameState.tutorialStep) {
+            case 2: // First enemy encounter
+                this.spawnTutorialEnemy();
+                break;
+            case 3: // Power-up tutorial
+                this.spawnTutorialPowerUp();
+                break;
+            case 5: // Shooter enemy tutorial
+                this.spawnTutorialShooterEnemy();
+                break;
+        }
+    }
+
+    spawnTutorialEnemy() {
+        const enemy = this.createEnemy();
+        enemy.style.top = '100px';
+        this.enemies.push(enemy);
+    }
+
+    spawnTutorialPowerUp() {
+        const powerUp = this.createPowerUp('double');
+        powerUp.style.top = '100px';
+        powerUp.style.left = '50%';
+        this.powerUps.push({
+            element: powerUp,
+            type: 'double'
+        });
+    }
+
+    spawnTutorialShooterEnemy() {
+        const enemy = this.createShooterEnemy();
+        enemy.style.top = '100px';
+        this.enemies.push(enemy);
+    }
+
+    // Modify power-up collection
+    handlePowerUpCollection(powerUp) {
+        switch(powerUp.type) {
+            case 'double':
+                this.doubleBullets = true;
+                this.gameState.permanentPowerUps.doubleBullets = true;
+                break;
+            case 'triple':
+                this.tripleShot = true;
+                this.gameState.permanentPowerUps.tripleShot = true;
+                break;
+            case 'wide':
+                this.wideShot = true;
+                this.gameState.permanentPowerUps.wideShot = true;
+                break;
+            case 'rapid':
+                this.rapidFire = true;
+                this.shootingInterval = 80; // Faster shooting
+                this.gameState.permanentPowerUps.rapidFire = true;
+                break;
+        }
+    }
+
+    shoot() {
+        if (this.tripleShot) {
+            this.bullets.push(this.createBullet(0));
+            this.bullets.push(this.createBullet(-15, 10));
+            this.bullets.push(this.createBullet(15, 10));
+        } else if (this.wideShot) {
+            this.bullets.push(this.createBullet(-20));
+            this.bullets.push(this.createBullet(0));
+            this.bullets.push(this.createBullet(20));
+        } else if (this.doubleBullets) {
+            this.bullets.push(this.createBullet(-10));
+            this.bullets.push(this.createBullet(10));
+        } else {
+            this.bullets.push(this.createBullet(0));
+        }
     }
 }
 
