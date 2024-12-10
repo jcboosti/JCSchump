@@ -604,6 +604,7 @@ class Game {
     }
     
     
+    
 
     createParticleExplosion(x, y) {
         const particleCount = 12;
@@ -839,6 +840,39 @@ class Game {
         this.enemyBullets = [];
     
         this.gameLoop = setInterval(() => {
+            this.gameLoop = setInterval(() => {
+                this.updatePlayerPosition();
+        
+                // Update companion ship movement
+                this.updateCompanionShip();
+        
+                // Player shooting logic
+                if (this.isShooting && Date.now() - this.lastShotTime > this.shootingInterval) {
+                    this.shoot();
+                    this.lastShotTime = Date.now();
+                }
+        
+                // Update player bullets, enemy bullets, power-ups, etc.
+        
+                // Player collision with the boss
+                if (this.boss && this.gameState.isBossFight && !this.invulnerable) {
+                    if (this.checkCollision(this.player, this.boss)) {
+                        this.playerHit(); // Player loses a life on collision
+                    }
+                }
+        
+                // Boss shooting logic
+                if (this.boss && this.gameState.isBossFight) {
+                    if (Math.random() < 0.02) {
+                        this.createBossBullet();
+                    }
+                }
+        
+                // Update enemies, power-ups, and other game logic
+                // ...
+        
+            }, 1000 / 60); // 60 FPS
+        
             this.updatePlayerPosition();
     
             // Update companion ship movement
