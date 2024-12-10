@@ -585,6 +585,8 @@ class Game {
         enemy.style.left = `${Math.random() * (this.canvas.clientWidth - 30)}px`;
         enemy.style.top = '-30px';
         enemy.dataset.id = Date.now();
+        enemy.dataset.hasFired = 'false';
+        enemy.dataset.type = 'triangle';
         this.canvas.appendChild(enemy);
         return enemy;
     }
@@ -593,10 +595,11 @@ class Game {
         const rect1 = elem1.getBoundingClientRect();
         const rect2 = elem2.getBoundingClientRect();
         return !(rect1.right < rect2.left || 
-                rect1.left > rect2.right || 
-                rect1.bottom < rect2.top || 
-                rect1.top > rect2.bottom);
+                 rect1.left > rect2.right || 
+                 rect1.bottom < rect2.top || 
+                 rect1.top > rect2.bottom);
     }
+    
 
     createParticleExplosion(x, y) {
         const particleCount = 12;
@@ -716,13 +719,19 @@ class Game {
     createShooterEnemy() {
         const enemy = document.createElement('div');
         enemy.className = 'shooter-enemy';
-        enemy.style.left = `${Math.random() * (this.canvas.clientWidth - 30)}px`;
-        enemy.style.top = '-30px';
-        enemy.dataset.id = Date.now();
-        enemy.dataset.hasFired = 'false';
+        enemy.dataset.direction = Math.random() < 0.5 ? '1' : '-1'; // Random direction
+        enemy.style.left = enemy.dataset.direction === '1' ? '-30px' : `${this.canvas.clientWidth + 30}px`;
+    
+        // Restrict vertical spawn to above halfway point
+        const canvasHeight = this.canvas.clientHeight;
+        const maxY = canvasHeight / 2; // Halfway point
+        enemy.style.top = `${Math.random() * maxY}px`;
+    
         this.canvas.appendChild(enemy);
         return enemy;
     }
+    
+    
 
     createEnemyBullet(x, y) {
         const bullet = document.createElement('div');
@@ -741,143 +750,102 @@ class Game {
         };
     }
 
+    createEnemyProjectile(enemy) {
+        const enemyRect = enemy.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
+    
+        const bullet = document.createElement('div');
+        bullet.className = 'enemy-bullet';
+        bullet.style.cssText = `
+            position: absolute;
+            width: 8px;
+            height: 16px;
+            background-color: #ff4081; /* Pink color */
+            border-radius: 4px;
+            left: ${enemyRect.left - canvasRect.left + enemyRect.width / 2 - 4}px;
+            top: ${enemyRect.top - canvasRect.top + enemyRect.height}px;
+        `;
+    
+        this.canvas.appendChild(bullet);
+    
+        // Add to enemy bullets array with downward velocity
+        this.enemyBullets.push({
+            element: bullet,
+            velocity: { x: 0, y: 5 }, // Downward movement
+        });
+    }
+    
+
     startGameLoop() {
         this.enemyBullets = [];
-        
+    
         this.gameLoop = setInterval(() => {
             this.updatePlayerPosition();
-
-            // Shooting logic update
+    
+            // Player shooting logic
             if (this.isShooting && Date.now() - this.lastShotTime > this.shootingInterval) {
                 this.shoot();
                 this.lastShotTime = Date.now();
             }
-
-            // Update companion ship position to mirror player movement
-            if (this.companionShip) {
-                const playerRect = this.player.getBoundingClientRect();
-                const offset = 60; // Distance from main ship
-                const companionLeft = parseFloat(this.player.style.left) + offset;
-                
-                // Mirror player position with offset
-                this.companionShip.style.left = `${companionLeft}px`;
-                this.companionShip.style.top = this.player.style.top;
-            }
-
-            // Update bullets
-            this.bullets.forEach((bullet, index) => {
-                const currentTop = parseInt(bullet.style.top);
-                bullet.style.top = `${currentTop - 10}px`;
+    
+            // Update player bullets
+            this.bullets.forEach((bullet, bulletIndex) => {
+                const currentTop = parseFloat(bullet.style.top);
+                bullet.style.top = `${currentTop - 10}px`; // Move bullet upward
+    
+                // Remove bullets that go off-screen
                 if (currentTop < -10) {
                     bullet.remove();
-                    this.bullets.splice(index, 1);
+                    this.bullets.splice(bulletIndex, 1);
+                    return; // Exit loop for this bullet
                 }
-            });
-
-            // Only spawn enemies if NOT in boss fight
-            if (!this.gameState.isBossFight) {
-                if (Math.random() < 0.03) {
-                    if (Math.random() < 0.3) {
-                        this.enemies.push(this.createShooterEnemy());
-                    } else {
-                        this.enemies.push(this.createEnemy());
-                    }
-                }
-            }
-
-            // Update enemies
-            this.enemies.forEach((enemy, enemyIndex) => {
-                const currentTop = parseInt(enemy.style.top);
-                const isShooter = enemy.className === 'shooter-enemy';
-                const hasFired = enemy.dataset.hasFired === 'true';
-                
-                if (isShooter) {
-                    // Shooter enemy behavior
-                    if (currentTop < 150 || hasFired) {  // Move until reaching firing position
-                        enemy.style.top = `${currentTop + (2 * this.gameState.difficulty)}px`;
-                    } else if (!hasFired) {
-                        // Fire straight down
-                        enemy.dataset.hasFired = 'true';
-                        const enemyRect = enemy.getBoundingClientRect();
-                        const canvasRect = this.canvas.getBoundingClientRect();
-                        
-                        // Create bullet at enemy position
-                        const bullet = this.createEnemyBullet(
-                            enemyRect.left - canvasRect.left + enemyRect.width/2,
-                            enemyRect.top - canvasRect.top + enemyRect.height
-                        );
-                        this.enemyBullets.push(bullet);
-                    }
-                } else {
-                    // Normal enemy behavior
-                    enemy.style.top = `${currentTop + (3 * this.gameState.difficulty)}px`;
-                }
-                
-                // Update enemies with scaled speed based on difficulty
-                const scaledSpeed = 3 * this.gameState.difficulty;  // Scale enemy speed
-                enemy.style.top = `${currentTop + scaledSpeed}px`;
-                
-                if (currentTop > this.canvas.clientHeight + 30) {
-                    enemy.remove();
-                    this.enemies.splice(enemyIndex, 1);
-                }
-
-                // Check player collision with enemies
-                if (this.checkCollision(this.player, enemy)) {
-                    this.playerHit();
-                }
-
-                // Check bullet collisions
-                this.bullets.forEach((bullet, bulletIndex) => {
+    
+                // Check for collisions with enemies
+                this.enemies.forEach((enemy, enemyIndex) => {
                     if (this.checkCollision(bullet, enemy)) {
+                        // Create explosion effect
                         const enemyRect = enemy.getBoundingClientRect();
                         const canvasRect = this.canvas.getBoundingClientRect();
-                        const enemyX = enemyRect.left - canvasRect.left + enemyRect.width / 2;
-                        const enemyY = enemyRect.top - canvasRect.top + enemyRect.height / 2;
-                        
-                        this.createParticleExplosion(enemyX, enemyY);
-                        this.playExplosionSound();
-
-                        // Increment kills counter and check for boss fight
-                        this.gameState.killsInLevel++;
-                        this.gameState.checkLevelUp();  // Check if we should start boss fight
-
-                        // Modify power-up spawn logic: 10% chance for power-up on enemy kill
-                        if (Math.random() < 0.1) {
-                            const powerUpType = Math.random() < 0.3 ? 'giant' : 'double';
-                            const powerUp = powerUpType === 'giant' ? 
-                                this.createGiantPowerUp() : this.createPowerUp();
-                            powerUp.style.left = `${enemyX - 10}px`;
-                            powerUp.style.top = `${enemyY - 10}px`;
-                            this.powerUps.push({ element: powerUp, type: powerUpType });
-                        }
-
+                        this.createParticleExplosion(
+                            enemyRect.left - canvasRect.left + enemyRect.width / 2,
+                            enemyRect.top - canvasRect.top + enemyRect.height / 2
+                        );
+    
+                        // Remove bullet and enemy
                         bullet.remove();
-                        enemy.remove();
                         this.bullets.splice(bulletIndex, 1);
+                        enemy.remove();
                         this.enemies.splice(enemyIndex, 1);
+    
+                        // Add score
                         this.gameState.addScore(100);
+                        this.gameState.killsInLevel++;
+    
+                        return; // Exit loop for this enemy
                     }
                 });
             });
-
+    
             // Update enemy bullets
             this.enemyBullets.forEach((bullet, bulletIndex) => {
                 const currentLeft = parseFloat(bullet.element.style.left);
                 const currentTop = parseFloat(bullet.element.style.top);
-                
+    
                 bullet.element.style.left = `${currentLeft + bullet.velocity.x}px`;
-                bullet.element.style.top = `${currentTop + bullet.velocity.y}px`;
-                
-                // Remove bullets that are off screen
-                if (currentTop > this.canvas.clientHeight || 
-                    currentTop < 0 || 
-                    currentLeft > this.canvas.clientWidth || 
-                    currentLeft < 0) {
+                bullet.element.style.top = `${currentTop + bullet.velocity.y}px`; // Move bullet in its velocity direction
+    
+                // Remove bullets that are off-screen
+                if (
+                    currentTop > this.canvas.clientHeight ||
+                    currentTop < 0 ||
+                    currentLeft > this.canvas.clientWidth ||
+                    currentLeft < 0
+                ) {
                     bullet.element.remove();
                     this.enemyBullets.splice(bulletIndex, 1);
+                    return;
                 }
-                
+    
                 // Check collision with player
                 if (this.checkCollision(this.player, bullet.element)) {
                     bullet.element.remove();
@@ -885,191 +853,63 @@ class Game {
                     this.playerHit();
                 }
             });
-
-            // Update power-ups
-            this.powerUps = this.powerUps.filter((powerUp, powerUpIndex) => {
-                const currentTop = parseInt(powerUp.element.style.top);
-                const scaledSpeed = 2 * this.gameState.difficulty;
-                
-                powerUp.element.style.top = `${currentTop + scaledSpeed}px`;
-                
-                // Remove if off screen
-                if (currentTop > this.canvas.clientHeight + 20) {
-                    powerUp.element.remove();
-                    return false;
+    
+            // Spawn and update enemies
+            if (!this.gameState.isBossFight && Math.random() < 0.03) {
+                if (Math.random() < 0.3) {
+                    this.enemies.push(this.createShooterEnemy());
+                } else {
+                    this.enemies.push(this.createEnemy());
                 }
-
-                // Check collision with player
-                if (this.checkCollision(this.player, powerUp.element)) {
-                    if (powerUp.element.classList.contains('giant-powerup')) {
-                        this.activateGiantMode();
-                    } else if (powerUp.type === 'companion') {
-                        this.createCompanionShip();
-                    } else {
-                        // Handle double bullets power-up
-                        this.doubleBullets = true;
-                        setTimeout(() => {
-                            this.doubleBullets = false;
-                        }, 10000);
-                    }
-                    powerUp.element.remove();
-                    return false;
-                }
-
-                return true;
-            });
-
-            // Update stars with scaled speed
-            this.stars.forEach(star => {
-                const currentTop = parseFloat(star.element.style.top);
-                const scaledSpeed = star.speed * this.gameState.difficulty;
-                star.element.style.top = `${currentTop + scaledSpeed}px`;
-            });
-
-            // Add star update at the start of game loop
-            this.updateStars();
-
-            // Add UFO update to game loop
-            this.updateUFO();
-
-            // Check bullet collisions with UFO
-            if (this.ufo) {
-                this.bullets.forEach((bullet, bulletIndex) => {
-                    if (this.checkCollision(bullet, this.ufo)) {
-                        const ufoRect = this.ufo.getBoundingClientRect();
-                        const canvasRect = this.canvas.getBoundingClientRect();
-                        
-                        // Create hit effect
-                        this.createParticleExplosion(
-                            ufoRect.left - canvasRect.left + ufoRect.width / 2,
-                            ufoRect.top - canvasRect.top + ufoRect.height / 2
-                        );
-                        
-                        bullet.remove();
-                        this.bullets.splice(bulletIndex, 1);
-                        this.ufoHits++;
-
-                        // Flash UFO when hit
-                        this.ufo.style.opacity = '0.5';
-                        setTimeout(() => {
-                            if (this.ufo) this.ufo.style.opacity = '1';
-                        }, 100);
-
-                        // Check if UFO is destroyed
-                        if (this.ufoHits >= 5) {
-                            // Play special UFO explosion sound
-                            this.playUFOExplosionSound();
-                            
-                            // Multiple explosions
-                            for (let i = 0; i < 3; i++) {
-                                setTimeout(() => {
-                                    if (!this.ufo) return;
-                                    this.createParticleExplosion(
-                                        ufoRect.left - canvasRect.left + Math.random() * ufoRect.width,
-                                        ufoRect.top - canvasRect.top + Math.random() * ufoRect.height
-                                    );
-                                }, i * 100);
-                            }
-                            
-                            // Drop companion ship power-up
-                            const powerUp = this.createPowerUp('companion');
-                            this.powerUps.push({
-                                element: powerUp,
-                                type: 'companion'
-                            });
-                            
-                            this.gameState.addScore(10000);
-                            this.ufo.remove();
-                            this.ufo = null;
-                            
-                            // Show score notification
-                            const notification = document.createElement('div');
-                            notification.textContent = '+10000';
-                            notification.style.cssText = `
-                                position: absolute;
-                                top: ${ufoRect.top - canvasRect.top}px;
-                                left: ${ufoRect.left - canvasRect.left}px;
-                                color: #FFD700;
-                                font-size: 24px;
-                                font-weight: bold;
-                                animation: fadeOut 2s forwards;
-                            `;
-                            this.canvas.appendChild(notification);
-                            setTimeout(() => notification.remove(), 2000);
+            }
+    
+            this.enemies.forEach((enemy, enemyIndex) => {
+                const currentLeft = parseInt(enemy.style.left);
+                const currentTop = parseInt(enemy.style.top);
+                const isShooter = enemy.className === 'shooter-enemy';
+    
+                if (isShooter) {
+                    const direction = parseInt(enemy.dataset.direction) || 1;
+                    const speed = 3 * this.gameState.difficulty;
+                    enemy.style.left = `${currentLeft + direction * speed}px`;
+    
+                    if (!enemy.dataset.hasFired || enemy.dataset.hasFired === 'false') {
+                        if (Math.random() < 0.01) {
+                            this.createEnemyProjectile(enemy);
+                            enemy.dataset.hasFired = 'true';
+                            setTimeout(() => enemy.dataset.hasFired = 'false', 2000); // Cooldown
                         }
                     }
-                });
-            }
-
-            // Handle power-up collection
-            this.powerUps.forEach((powerUp, powerUpIndex) => {
-                if (this.checkCollision(this.player, powerUp.element)) {
-                    if (powerUp.element.classList.contains('giant-powerup')) {
-                        this.activateGiantMode();
-                    } else if (powerUp.type === 'companion') {
-                        this.createCompanionShip();
-                    } else {
-                        // Handle double bullets power-up
-                        this.doubleBullets = true;
-                        setTimeout(() => {
-                            this.doubleBullets = false;
-                        }, 10000);
-                    }
-                    powerUp.element.remove();
-                    this.powerUps.splice(powerUpIndex, 1);
-                }
-            });
-
-            // Handle giant mode collisions
-            if (this.gameState.isGiantMode) {
-                this.enemies.forEach((enemy, index) => {
-                    if (this.checkCollision(this.player, enemy)) {
-                        this.createParticleExplosion(
-                            enemy.getBoundingClientRect().left,
-                            enemy.getBoundingClientRect().top
-                        );
+    
+                    if (currentLeft < -30 || currentLeft > this.canvas.clientWidth + 30) {
                         enemy.remove();
-                        this.enemies.splice(index, 1);
-                        this.gameState.addScore(100);
+                        this.enemies.splice(enemyIndex, 1);
                     }
-                });
-            }
-
-            // Update space invaders
-            this.updateSpaceInvaders();
-
-            // Check bullet collisions with boss
-            if (this.boss && this.gameState.isBossFight) {
-                this.bullets.forEach((bullet, bulletIndex) => {
-                    if (this.checkCollision(bullet, this.boss)) {
-                        const bossRect = this.boss.getBoundingClientRect();
-                        const canvasRect = this.canvas.getBoundingClientRect();
-                        
-                        this.createParticleExplosion(
-                            bossRect.left - canvasRect.left + Math.random() * bossRect.width,
-                            bossRect.top - canvasRect.top + Math.random() * bossRect.height
-                        );
-                        
-                        bullet.remove();
-                        this.bullets.splice(bulletIndex, 1);
-                        
-                        // Damage boss
-                        this.gameState.bossHealth -= 1;
-                        this.bossHealthBar.style.width = `${(this.gameState.bossHealth / this.gameState.maxBossHealth) * 100}%`;
-                        
-                        // Check if boss is defeated
-                        if (this.gameState.bossHealth <= 0) {
-                            this.defeatBoss();
-                        }
+                } else {
+                    enemy.style.top = `${currentTop + 2 * this.gameState.difficulty}px`;
+    
+                    if (currentTop > this.canvas.clientHeight + 30) {
+                        enemy.remove();
+                        this.enemies.splice(enemyIndex, 1);
                     }
-                });
-            }
-
-            // Update boss
+                }
+    
+                if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
+                    this.playerHit();
+                    enemy.remove();
+                    this.enemies.splice(enemyIndex, 1);
+                }
+            });
+    
+            // Update boss (if applicable)
             this.updateBoss();
-
-        }, 1000 / 60);
+    
+        }, 1000 / 60); // 60 FPS
     }
+    
+    
+    
+    
 
     shakeScreen(intensity = 20, duration = 500) {
         const gameContainer = document.getElementById('game-container');
@@ -1479,7 +1319,6 @@ class Game {
             top: -180px;
             left: 50%;
             transform: translateX(-50%);
-            border: 2px solid #FF0000;  /* Add border to make hitbox visible */
         `;
         this.canvas.appendChild(boss);
         this.boss = boss;
