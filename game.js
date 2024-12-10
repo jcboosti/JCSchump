@@ -557,27 +557,28 @@ class Game {
         this.player.style.top = `${y}px`;
     }
 
-    createBullet(xOffset = 0, yOffset = 0) {
+    createBullet(offsetX = 0) {
         const bullet = document.createElement('div');
         bullet.className = 'bullet';
         const playerRect = this.player.getBoundingClientRect();
         const canvasRect = this.canvas.getBoundingClientRect();
-        
+    
         const playerCenterX = playerRect.left - canvasRect.left + (playerRect.width / 2);
-        
+    
         bullet.style.cssText = `
             position: absolute;
             width: 6px;
             height: 15px;
             background-color: #00ff00;
             border-radius: 3px;
-            left: ${playerCenterX + xOffset}px;
-            top: ${playerRect.top - canvasRect.top + yOffset}px;
+            left: ${playerCenterX + offsetX}px;
+            top: ${playerRect.top - canvasRect.top}px;
         `;
-        
+    
         this.canvas.appendChild(bullet);
         return bullet;
     }
+    
 
     createEnemy() {
         const enemy = document.createElement('div');
@@ -778,12 +779,70 @@ class Game {
         });
     }
     
+    handlePowerUpCollection(powerUp) {
+        switch (powerUp.type) {
+            case 'double':
+                this.doubleBullets = true;
+                // Disable power-up after 10 seconds
+                setTimeout(() => {
+                    this.doubleBullets = false;
+                }, 10000);
+                break;
+            case 'companion':
+                this.createCompanionShip();
+                break;
+        }
+    }
+
+    spawnPowerUp(x, y) {
+        const availablePowerUps = ['double', 'companion'];
+    
+        // Filter out power-ups the player already has
+        const activePowerUps = [];
+        if (this.doubleBullets) activePowerUps.push('double');
+        if (this.companionShip) activePowerUps.push('companion');
+    
+        const possiblePowerUps = availablePowerUps.filter((type) => !activePowerUps.includes(type));
+    
+        // If no power-ups can be dropped, return
+        if (possiblePowerUps.length === 0) return;
+    
+        // Randomly choose a power-up from the remaining options
+        const chosenPowerUp = possiblePowerUps[Math.floor(Math.random() * possiblePowerUps.length)];
+    
+        // Create and position the power-up
+        const powerUp = document.createElement('div');
+        powerUp.className = `power-up ${chosenPowerUp}-powerup`;
+        powerUp.dataset.type = chosenPowerUp;
+        powerUp.style.cssText = `
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: ${chosenPowerUp === 'double' ? '#FFD700' : '#4CAF50'};
+            border-radius: 50%;
+            left: ${x}px;
+            top: ${y}px;
+        `;
+    
+        this.canvas.appendChild(powerUp);
+    
+        // Add to power-ups array
+        this.powerUps.push({
+            element: powerUp,
+            type: chosenPowerUp,
+        });
+    }
+    
+    
 
     startGameLoop() {
         this.enemyBullets = [];
     
         this.gameLoop = setInterval(() => {
             this.updatePlayerPosition();
+    
+            // Update companion ship movement
+            this.updateCompanionShip();
     
             // Player shooting logic
             if (this.isShooting && Date.now() - this.lastShotTime > this.shootingInterval) {
@@ -800,7 +859,7 @@ class Game {
                 if (currentTop < -10) {
                     bullet.remove();
                     this.bullets.splice(bulletIndex, 1);
-                    return; // Exit loop for this bullet
+                    return;
                 }
     
                 // Check for collisions with enemies
@@ -824,6 +883,14 @@ class Game {
                         this.gameState.addScore(100);
                         this.gameState.killsInLevel++;
     
+                        // Randomly spawn a power-up
+                        if (Math.random() < 0.2) { // 20% chance to spawn a power-up
+                            this.spawnPowerUp(
+                                enemyRect.left - canvasRect.left,
+                                enemyRect.top - canvasRect.top
+                            );
+                        }
+    
                         return; // Exit loop for this enemy
                     }
                 });
@@ -831,7 +898,6 @@ class Game {
                 // Check for collisions with the boss
                 if (this.boss && this.gameState.isBossFight) {
                     if (this.checkCollision(bullet, this.boss)) {
-                        // Create explosion effect on the boss
                         const bossRect = this.boss.getBoundingClientRect();
                         const canvasRect = this.canvas.getBoundingClientRect();
                         this.createParticleExplosion(
@@ -884,14 +950,36 @@ class Game {
                 }
             });
     
+            // Update power-ups
+            this.powerUps.forEach((powerUp, powerUpIndex) => {
+                const currentTop = parseFloat(powerUp.element.style.top);
+    
+                // Move power-up downward
+                powerUp.element.style.top = `${currentTop + 2}px`;
+    
+                // Remove power-ups that go off-screen
+                if (currentTop > this.canvas.clientHeight + 20) {
+                    powerUp.element.remove();
+                    this.powerUps.splice(powerUpIndex, 1);
+                    return;
+                }
+    
+                // Check collision with player
+                if (this.checkCollision(this.player, powerUp.element)) {
+                    this.handlePowerUpCollection(powerUp);
+                    powerUp.element.remove();
+                    this.powerUps.splice(powerUpIndex, 1);
+                }
+            });
+    
             // Boss shooting logic
             if (this.boss && this.gameState.isBossFight) {
-                if (Math.random() < 0.02) { // Adjust shooting frequency
+                if (Math.random() < 0.02) {
                     this.createBossBullet();
                 }
             }
     
-            // Spawn and update enemies
+            // Update enemies
             if (!this.gameState.isBossFight && Math.random() < 0.03) {
                 if (Math.random() < 0.3) {
                     this.enemies.push(this.createShooterEnemy());
@@ -938,11 +1026,14 @@ class Game {
                 }
             });
     
-            // Update boss position or other behaviors
+            // Update boss position
             this.updateBoss();
     
         }, 1000 / 60); // 60 FPS
     }
+    
+    
+    
     
     
     
@@ -1028,13 +1119,14 @@ class Game {
 
     createPowerUp(type = 'double') {
         const powerUp = document.createElement('div');
-        powerUp.className = type === 'companion' ? 'power-up companion-powerup' : 'power-up';
-        powerUp.dataset.type = type;  // Store power-up type in dataset
+        powerUp.className = `power-up ${type}-powerup`;
+        powerUp.dataset.type = type;
         powerUp.style.left = `${Math.random() * (this.canvas.clientWidth - 20)}px`;
         powerUp.style.top = '-20px';
         this.canvas.appendChild(powerUp);
         return powerUp;
     }
+    
 
     createStar() {
         const star = document.createElement('div');
@@ -1170,12 +1262,14 @@ class Game {
     }
 
     createCompanionShip() {
+        // Remove the old companion ship if it exists
         if (this.companionShip) {
             this.companionShip.remove();
         }
-        
+    
+        // Create the companion ship element
         this.companionShip = document.createElement('div');
-        this.companionShip.className = 'player companion-ship';
+        this.companionShip.className = 'companion-ship';
         this.companionShip.style.cssText = `
             width: 40px;
             height: 50px;
@@ -1186,24 +1280,33 @@ class Game {
             position: absolute;
         `;
         this.canvas.appendChild(this.companionShip);
-        
-        // Set initial position
+    
+        // Position the companion ship near the player
         const playerRect = this.player.getBoundingClientRect();
-        this.companionShip.style.left = `${parseFloat(this.player.style.left) + 60}px`;
-        this.companionShip.style.top = this.player.style.top;
-        
+        const canvasRect = this.canvas.getBoundingClientRect();
+    
+        this.companionShip.style.left = `${playerRect.left - canvasRect.left + 60}px`; // Offset to the right of the player
+        this.companionShip.style.top = `${playerRect.top - canvasRect.top}px`;
+    
         return this.companionShip;
     }
+    
+    
+    
 
     updateCompanionShip() {
         if (this.companionShip) {
             const playerRect = this.player.getBoundingClientRect();
-            const offset = 60; // Distance from main ship
-            
-            this.companionShip.style.left = `${parseFloat(this.player.style.left) + offset}px`;
-            this.companionShip.style.top = this.player.style.top;
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const offset = 60; // Distance between player and companion
+    
+            this.companionShip.style.left = `${playerRect.left - canvasRect.left + offset}px`;
+            this.companionShip.style.top = `${playerRect.top - canvasRect.top}px`;
         }
     }
+    
+    
+    
 
     createGiantPowerUp() {
         const powerUp = document.createElement('div');
@@ -1322,27 +1425,23 @@ class Game {
     }
 
     // Add new method for companion ship bullets
-    createCompanionBullet(xOffset = 0, yOffset = 0) {
+    createCompanionBullet(x, y) {
         const bullet = document.createElement('div');
-        bullet.className = 'bullet';
-        const companionRect = this.companionShip.getBoundingClientRect();
-        const canvasRect = this.canvas.getBoundingClientRect();
-        
-        const companionCenterX = companionRect.left - canvasRect.left + (companionRect.width / 2);
-        
+        bullet.className = 'companion-bullet';
         bullet.style.cssText = `
             position: absolute;
             width: 6px;
             height: 15px;
-            background-color: #00ff00;
+            background-color: #00FF00; // Green color for companion bullets
             border-radius: 3px;
-            left: ${companionCenterX + xOffset}px;
-            top: ${companionRect.top - canvasRect.top + yOffset}px;
+            left: ${x}px;
+            top: ${y}px;
         `;
-        
+    
         this.canvas.appendChild(bullet);
         return bullet;
     }
+    
 
     spawnBoss() {
         const boss = document.createElement('div');
@@ -1522,43 +1621,52 @@ class Game {
 
     // Modify power-up collection
     handlePowerUpCollection(powerUp) {
-        switch(powerUp.type) {
+        switch (powerUp.type) {
             case 'double':
                 this.doubleBullets = true;
-                this.gameState.permanentPowerUps.doubleBullets = true;
+                // Disable power-up after 10 seconds
+                setTimeout(() => {
+                    this.doubleBullets = false;
+                }, 10000);
                 break;
-            case 'triple':
-                this.tripleShot = true;
-                this.gameState.permanentPowerUps.tripleShot = true;
-                break;
-            case 'wide':
-                this.wideShot = true;
-                this.gameState.permanentPowerUps.wideShot = true;
-                break;
-            case 'rapid':
-                this.rapidFire = true;
-                this.shootingInterval = 80; // Faster shooting
-                this.gameState.permanentPowerUps.rapidFire = true;
+            case 'companion':
+                this.createCompanionShip();
                 break;
         }
     }
+    
+    
 
     shoot() {
-        if (this.tripleShot) {
-            this.bullets.push(this.createBullet(0));
-            this.bullets.push(this.createBullet(-15, 10));
-            this.bullets.push(this.createBullet(15, 10));
-        } else if (this.wideShot) {
-            this.bullets.push(this.createBullet(-20));
-            this.bullets.push(this.createBullet(0));
-            this.bullets.push(this.createBullet(20));
-        } else if (this.doubleBullets) {
-            this.bullets.push(this.createBullet(-10));
-            this.bullets.push(this.createBullet(10));
+        // Player bullets
+        if (this.doubleBullets) {
+            this.bullets.push(this.createBullet(-10)); // Left bullet
+            this.bullets.push(this.createBullet(10));  // Right bullet
         } else {
-            this.bullets.push(this.createBullet(0));
+            this.bullets.push(this.createBullet(0));   // Single bullet
+        }
+    
+        // Companion bullets
+        if (this.companionShip) {
+            const companionRect = this.companionShip.getBoundingClientRect();
+            const canvasRect = this.canvas.getBoundingClientRect();
+            const companionCenterX = companionRect.left - canvasRect.left + companionRect.width / 2;
+            const companionTop = companionRect.top - canvasRect.top;
+    
+            if (this.doubleBullets) {
+                // Companion fires double bullets
+                this.bullets.push(this.createCompanionBullet(companionCenterX - 10, companionTop)); // Left bullet
+                this.bullets.push(this.createCompanionBullet(companionCenterX + 10, companionTop)); // Right bullet
+            } else {
+                // Companion fires single bullet
+                this.bullets.push(this.createCompanionBullet(companionCenterX, companionTop));
+            }
         }
     }
+    
+    
+    
+    
 }
 
 // Initialize game

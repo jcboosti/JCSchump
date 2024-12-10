@@ -92,22 +92,30 @@
             height: 20px;
             background-color: #FFD700;
             position: absolute;
-            clip-path: polygon(
-                50% 0%, 61% 35%, 98% 35%, 68% 57%, 
-                79% 91%, 50% 70%, 21% 91%, 32% 57%, 
-                2% 35%, 39% 35%
-            );
+            clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%,
+                    79% 91%, 50% 70%, 21% 91%, 32% 57%,
+                    2% 35%, 39% 35%);
             animation: spin 2s linear infinite;
         }
 
         @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         @keyframes fadeOut {
-            from { opacity: 1; }
-            to { opacity: 0; }
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
         }
 
         .error-boundary {
@@ -137,7 +145,7 @@
             box-shadow: 0 0 20px #FFD700;
             transition: opacity 0.1s;
         }
-        
+
         .ufo::before {
             content: '';
             position: absolute;
@@ -172,9 +180,17 @@
         }
 
         @keyframes flash {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         .companion-powerup {
@@ -183,9 +199,13 @@
         }
 
         .companion-ship {
-            opacity: 0.7;
-            filter: hue-rotate(180deg);
+            position: absolute;
+            width: 40px;
+            height: 50px;
+            z-index: 10;
+            /* Ensure it appears above other elements */
         }
+
 
         .giant-powerup {
             background-color: #FF1493 !important;
@@ -197,12 +217,10 @@
             height: 40px;
             position: absolute;
             background-color: #4CAF50;
-            clip-path: polygon(
-                0% 25%, 40% 25%, 40% 0%, 60% 0%, 
-                60% 25%, 100% 25%, 100% 60%, 
-                60% 60%, 60% 100%, 40% 100%, 
-                40% 60%, 0% 60%
-            );
+            clip-path: polygon(0% 25%, 40% 25%, 40% 0%, 60% 0%,
+                    60% 25%, 100% 25%, 100% 60%,
+                    60% 60%, 60% 100%, 40% 100%,
+                    40% 60%, 0% 60%);
         }
     </style>
 </head>
