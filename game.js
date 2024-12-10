@@ -594,11 +594,14 @@ class Game {
     checkCollision(elem1, elem2) {
         const rect1 = elem1.getBoundingClientRect();
         const rect2 = elem2.getBoundingClientRect();
-        return !(rect1.right < rect2.left || 
-                 rect1.left > rect2.right || 
-                 rect1.bottom < rect2.top || 
-                 rect1.top > rect2.bottom);
+        return !(
+            rect1.right < rect2.left ||
+            rect1.left > rect2.right ||
+            rect1.bottom < rect2.top ||
+            rect1.top > rect2.bottom
+        );
     }
+    
     
 
     createParticleExplosion(x, y) {
@@ -824,6 +827,33 @@ class Game {
                         return; // Exit loop for this enemy
                     }
                 });
+    
+                // Check for collisions with the boss
+                if (this.boss && this.gameState.isBossFight) {
+                    if (this.checkCollision(bullet, this.boss)) {
+                        // Create explosion effect on the boss
+                        const bossRect = this.boss.getBoundingClientRect();
+                        const canvasRect = this.canvas.getBoundingClientRect();
+                        this.createParticleExplosion(
+                            bossRect.left - canvasRect.left + Math.random() * bossRect.width,
+                            bossRect.top - canvasRect.top + Math.random() * bossRect.height
+                        );
+    
+                        bullet.remove();
+                        this.bullets.splice(bulletIndex, 1);
+    
+                        // Damage the boss
+                        this.gameState.bossHealth -= 1;
+                        this.bossHealthBar.style.width = `${(this.gameState.bossHealth / this.gameState.maxBossHealth) * 100}%`;
+    
+                        // Check if boss is defeated
+                        if (this.gameState.bossHealth <= 0) {
+                            this.defeatBoss();
+                        }
+    
+                        return; // Exit loop for this bullet
+                    }
+                }
             });
     
             // Update enemy bullets
@@ -854,6 +884,13 @@ class Game {
                 }
             });
     
+            // Boss shooting logic
+            if (this.boss && this.gameState.isBossFight) {
+                if (Math.random() < 0.02) { // Adjust shooting frequency
+                    this.createBossBullet();
+                }
+            }
+    
             // Spawn and update enemies
             if (!this.gameState.isBossFight && Math.random() < 0.03) {
                 if (Math.random() < 0.3) {
@@ -877,7 +914,7 @@ class Game {
                         if (Math.random() < 0.01) {
                             this.createEnemyProjectile(enemy);
                             enemy.dataset.hasFired = 'true';
-                            setTimeout(() => enemy.dataset.hasFired = 'false', 2000); // Cooldown
+                            setTimeout(() => (enemy.dataset.hasFired = 'false'), 2000); // Cooldown
                         }
                     }
     
@@ -901,11 +938,13 @@ class Game {
                 }
             });
     
-            // Update boss (if applicable)
+            // Update boss position or other behaviors
             this.updateBoss();
     
         }, 1000 / 60); // 60 FPS
     }
+    
+    
     
     
     
@@ -1378,12 +1417,19 @@ class Game {
     createBossBullet() {
         const bossRect = this.boss.getBoundingClientRect();
         const playerRect = this.player.getBoundingClientRect();
-        
-        // Calculate angle to player
-        const dx = playerRect.left - bossRect.left;
-        const dy = playerRect.top - bossRect.top;
-        const angle = Math.atan2(dy, dx);
-        
+        const canvasRect = this.canvas.getBoundingClientRect();
+    
+        // Calculate the angle from the boss to the player
+        const dx = (playerRect.left + playerRect.width / 2) - (bossRect.left + bossRect.width / 2);
+        const dy = (playerRect.top + playerRect.height / 2) - (bossRect.top + bossRect.height / 2);
+        const magnitude = Math.sqrt(dx * dx + dy * dy); // Normalize the vector
+        const speed = 7; // Bullet speed
+        const velocity = {
+            x: (dx / magnitude) * speed,
+            y: (dy / magnitude) * speed,
+        };
+    
+        // Create the bullet
         const bullet = document.createElement('div');
         bullet.className = 'boss-bullet';
         bullet.style.cssText = `
@@ -1392,19 +1438,20 @@ class Game {
             height: 15px;
             background-color: #FF0000;
             border-radius: 50%;
-            left: ${bossRect.left - this.canvas.getBoundingClientRect().left + bossRect.width/2}px;
-            top: ${bossRect.top - this.canvas.getBoundingClientRect().top + bossRect.height}px;
+            left: ${bossRect.left - canvasRect.left + bossRect.width / 2}px;
+            top: ${bossRect.top - canvasRect.top + bossRect.height}px;
         `;
-        
+    
         this.canvas.appendChild(bullet);
+    
+        // Add bullet to the enemy bullets array with velocity
         this.enemyBullets.push({
             element: bullet,
-            velocity: {
-                x: Math.cos(angle) * 7,
-                y: Math.sin(angle) * 7
-            }
+            velocity,
         });
     }
+    
+    
 
     defeatBoss() {
         // Create multiple explosions
