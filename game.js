@@ -1017,19 +1017,23 @@ class Game {
                         this.enemies.splice(enemyIndex, 1);
                     }
                 }
-                }
-    
+
                 if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
                     this.playerHit();
                     enemy.remove();
                     this.enemies.splice(enemyIndex, 1);
                 }
-            });
+                })
     
-            // Update boss position
-            this.updateBoss();
+                
+
+                // Update boss position
+                this.updateBoss();
+            }, 1000 / 60);
     
-        }, 1000 / 60);
+            
+    
+        
     }
     
     
@@ -1067,7 +1071,7 @@ class Game {
         const particles = [];
         
         for (let i = 0; i < particleCount; i++) {
-            const particle = document.createElement('div');
+            let particle = document.createElement('div');
             particle.style.cssText = `
                 position: absolute;
                 width: 8px;
