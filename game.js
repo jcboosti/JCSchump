@@ -595,14 +595,49 @@ class Game {
     checkCollision(elem1, elem2) {
         const rect1 = elem1.getBoundingClientRect();
         const rect2 = elem2.getBoundingClientRect();
-        return !(
-            rect1.right < rect2.left ||
+    
+        // Check for bounding box collision first
+        if (rect1.right < rect2.left ||
             rect1.left > rect2.right ||
             rect1.bottom < rect2.top ||
-            rect1.top > rect2.bottom
-        );
+            rect1.top > rect2.bottom) {
+            return false; // No collision
+        }
+    
+        // Get the actual pixel data for more precise collision
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+    
+        // Draw elements onto the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(this.getImageFromElement(elem1), rect1.left, rect1.top, rect1.width, rect1.height);
+        ctx.drawImage(this.getImageFromElement(elem2), rect2.left, rect2.top, rect2.width, rect2.height);
+    
+        // Get pixel data
+        const imageData1 = ctx.getImageData(rect1.left, rect1.top, rect1.width, rect1.height);
+        const imageData2 = ctx.getImageData(rect2.left, rect2.top, rect2.width, rect2.height);
+    
+        // Check for pixel overlap
+        for (let y = 0; y < Math.min(rect1.height, rect2.height); y++) {
+            for (let x = 0; x < Math.min(rect1.width, rect2.width); x++) {
+                const index1 = (y * rect1.width + x) * 4 + 3; // Alpha channel
+                const index2 = (y * rect2.width + x) * 4 + 3; // Alpha channel
+    
+                if (imageData1.data[index1] > 0 && imageData2.data[index2] > 0) {
+                    return true; // Pixel overlap
+                }
+            }
+        }
+    
+        return false; // No pixel overlap
     }
     
+    getImageFromElement(element) {
+        const img = new Image();
+        const style = window.getComputedStyle(element);
+        img.src = style.backgroundImage.slice(5, -2);
+        return img;
+    }
     
     
 
