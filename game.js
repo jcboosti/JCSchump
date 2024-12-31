@@ -1564,12 +1564,14 @@ class Game {
         // Create multiple explosions
         for (let i = 0; i < 10; i++) {
             setTimeout(() => {
-                const bossRect = this.boss.getBoundingClientRect();
-                const canvasRect = this.canvas.getBoundingClientRect();
-                this.createParticleExplosion(
-                    bossRect.left - canvasRect.left + Math.random() * bossRect.width,
-                    bossRect.top - canvasRect.top + Math.random() * bossRect.height
-                );
+                if (this.boss) {
+                    const bossRect = this.boss.getBoundingClientRect();
+                    const canvasRect = this.canvas.getBoundingClientRect();
+                    this.createParticleExplosion(
+                        bossRect.left - canvasRect.left + Math.random() * bossRect.width,
+                        bossRect.top - canvasRect.top + Math.random() * bossRect.height
+                    );
+                }
             }, i * 100);
         }
 
