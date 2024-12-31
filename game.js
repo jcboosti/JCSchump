@@ -1017,15 +1017,12 @@ class Game {
                         this.enemies.splice(enemyIndex, 1);
                     }
                 }
-    
-                if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
-                    this.playerHit();
-                    enemy.remove();
-                    this.enemies.splice(enemyIndex, 1);
                 }
     
-                if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
-                    this.playerHit();
+                if (this.checkCollision(this.player, enemy)) {
+                    if (!this.invulnerable) {
+                        this.playerHit();
+                    }
                     enemy.remove();
                     this.enemies.splice(enemyIndex, 1);
                 }
