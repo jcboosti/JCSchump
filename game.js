@@ -1524,28 +1524,31 @@ class Game {
         this.bossHealthBar = healthFill;
     }
 
+    
+    
     updateBoss() {
         if (!this.boss || !this.gameState.isBossFight) return;
-
-        // Boss movement pattern
+    
+        const currentTime = Date.now();
+        if (currentTime - this.lastBossUpdateTime < this.bossUpdateInterval) {
+            return; // Skip update if the interval hasn't passed
+        }
+        this.lastBossUpdateTime = currentTime;
+    
+        // Boss movement logic (e.g., sine wave pattern)
         const time = Date.now() / 1000;
         const centerX = this.canvas.clientWidth / 2;
         const amplitude = this.canvas.clientWidth / 3;
-        
-        // Sine wave movement
         const x = centerX + Math.sin(time) * amplitude;
+    
         this.boss.style.left = `${x}px`;
-        
-        // Ensure boss is on screen
+    
+        // Ensure boss moves into the screen
         if (parseFloat(this.boss.style.top) < 50) {
             this.boss.style.top = `${parseFloat(this.boss.style.top) + 2}px`;
         }
-
-        // Boss shooting
-        if (Math.random() < 0.05) { // 5% chance each frame to shoot
-            this.createBossBullet();
-        }
     }
+    
 
     createBossBullet() {
         const bossRect = this.boss.getBoundingClientRect();
