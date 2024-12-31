@@ -670,29 +670,24 @@ class Game {
     playerHit() {
         if (this.invulnerable) return;
         
-        // Check if player is colliding with the boss
-        if (this.boss && this.gameState.isBossFight && this.checkCollision(this.player, this.boss)) {
-            // Vibrate if supported (200ms vibration)
-            if ('vibrate' in navigator) {
-                navigator.vibrate(200);
-            }
-            
-            // Create explosion at player position
-            const playerRect = this.player.getBoundingClientRect();
-            const canvasRect = this.canvas.getBoundingClientRect();
-            this.createPlayerExplosion(
-                playerRect.left - canvasRect.left + playerRect.width / 2,
-                playerRect.top - canvasRect.top + playerRect.height / 2
-            );
-            
-            // Shake screen
-            this.shakeScreen();
-            
-            this.invulnerable = true;
-            this.player.style.visibility = 'hidden';
-        } else {
-            return;
+        // Vibrate if supported (200ms vibration)
+        if ('vibrate' in navigator) {
+            navigator.vibrate(200);
         }
+        
+        // Create explosion at player position
+        const playerRect = this.player.getBoundingClientRect();
+        const canvasRect = this.canvas.getBoundingClientRect();
+        this.createPlayerExplosion(
+            playerRect.left - canvasRect.left + playerRect.width / 2,
+            playerRect.top - canvasRect.top + playerRect.height / 2
+        );
+        
+        // Shake screen
+        this.shakeScreen();
+        
+        this.invulnerable = true;
+        this.player.style.visibility = 'hidden';
         
         const isGameOver = this.gameState.loseLife();
         if (isGameOver) {
@@ -1018,14 +1013,13 @@ class Game {
                     }
                 }
 
-                if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
+                if (this.checkCollision(this.player, enemy)) {
                     this.playerHit();
                     enemy.remove();
                     this.enemies.splice(enemyIndex, 1);
                 }
-                })
+            });
     
-                
 
                 // Update boss position
                 this.updateBoss();
@@ -1498,10 +1492,14 @@ class Game {
     
     updateBoss() {
         if (!this.boss || !this.gameState.isBossFight) return;
+        
+        if (this.checkCollision(this.player, this.boss)) {
+            this.playerHit();
+        }
     
         const currentTime = Date.now();
         if (currentTime - this.lastBossUpdateTime < this.bossUpdateInterval) {
-            return; // Skip update if the interval hasn't passed
+            return;
         }
         this.lastBossUpdateTime = currentTime;
     
