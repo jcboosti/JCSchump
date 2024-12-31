@@ -670,14 +670,9 @@ class Game {
     playerHit() {
         if (this.invulnerable) return;
         
-        // Check if player is colliding with the boss
-        if (this.boss && this.gameState.isBossFight && this.checkCollision(this.player, this.boss)) {
-            // Vibrate if supported (200ms vibration)
-            if ('vibrate' in navigator) {
-                navigator.vibrate(200);
-            }
-        } else {
-            return;
+        // Vibrate if supported (200ms vibration)
+        if ('vibrate' in navigator) {
+            navigator.vibrate(200);
         }
         
         // Create explosion at player position
@@ -947,12 +942,6 @@ class Game {
                     return;
                 }
     
-                // Check collision with player
-                if (this.checkCollision(this.player, bullet.element)) {
-                    bullet.element.remove();
-                    this.enemyBullets.splice(bulletIndex, 1);
-                    this.playerHit();
-                }
             });
     
             // Update power-ups
@@ -1029,12 +1018,18 @@ class Game {
                     enemy.remove();
                     this.enemies.splice(enemyIndex, 1);
                 }
+    
+                if (this.checkCollision(this.player, enemy) && !this.invulnerable) {
+                    this.playerHit();
+                    enemy.remove();
+                    this.enemies.splice(enemyIndex, 1);
+                }
             });
     
             // Update boss position
             this.updateBoss();
     
-        }, 1000 / 60); // 60 FPS
+        }, 1000 / 60);
     }
     
     
